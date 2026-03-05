@@ -1,0 +1,37 @@
+# Python
+python/venv/
+__pycache__/
+*.pyc
+
+# Android build
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Miscellaneous local files
+misc/
+
+# Virtualenv at root (legacy)
+venv/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
+
+# Work notes
+CLAUDE.md
+ANDROID.md
+TODO
+
+# Claude
+.claude/
+
+# Legacy copy of bplog.py at root
+bplog.py
+
+# Android gradle.properties (local)
+android/gradle.properties
