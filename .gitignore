@@ -31,7 +31,7 @@ TODO
 .claude/
 
 # Legacy copy of bplog.py at root
-bplog.py
+/bplog.py
 
 # Android gradle.properties (local)
 android/gradle.properties
