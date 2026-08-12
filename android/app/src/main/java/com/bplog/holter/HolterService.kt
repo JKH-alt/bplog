@@ -1,10 +1,15 @@
 package com.bplog.holter
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.os.Build
 import android.os.IBinder
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.bplog.holter.db.AppDatabase
@@ -17,7 +22,7 @@ class HolterService : Service() {
 
     companion object {
         const val TAG = "HolterService"
-        const val CHANNEL_ID = "bplog_holter"
+        const val CHANNEL_ID = "bplog_holter_alerts_v2"
         const val NOTIFICATION_ID = 1
         const val EXTRA_INTERVAL = "interval_seconds"
     }
@@ -73,61 +78,94 @@ class HolterService : Service() {
                 Log.w(TAG, "Measurement failed")
             }
 
-            // Calculate next time
             val nextTime = fmt.format(Date(now + intervalSeconds * 1000L))
-            delay(2000) // Brief pause to show result
+            delay(2000) // Brief pause to display result
             updateNotification("Last: ${fmt.format(Date(now))} · Next at $nextTime")
 
-            // Countdown delay with audio beeps before next measurement
+            // Run countdown delay with audio beeps and vibration
             runCountdownDelay(intervalSeconds)
         }
     }
 
     private suspend fun runCountdownDelay(intervalSeconds: Int) {
         val totalMs = (intervalSeconds * 1000L) - 2000L
+        if (totalMs <= 0) return
+
         val tenMinMs = 10 * 60 * 1000L   // 10 minutes
         val sixMinMs = 6 * 60 * 1000L    // 6 minutes
         val fiveMinMs = 5 * 60 * 1000L   // 5 minutes
 
-        if (totalMs > tenMinMs) {
-            // Delay until T-10 minutes
+        if (totalMs >= tenMinMs) {
+            // Long intervals (>= 10 minutes)
             delay(totalMs - tenMinMs)
-            playBeeps(3) // 3 beeps at 10 minutes before
+            playBeepsAndVibrate(3) // 3 beeps at T-10 min
 
-            // Delay 4 minutes until T-6 minutes
             delay(tenMinMs - sixMinMs)
-            playBeeps(2) // 2 beeps at 6 minutes before
+            playBeepsAndVibrate(2) // 2 beeps at T-6 min
 
-            // Delay 1 minute until T-5 minutes
             delay(sixMinMs - fiveMinMs)
-            playBeeps(1) // 1 beep at 5 minutes before
+            playBeepsAndVibrate(1) // 1 beep at T-5 min
 
-            // Delay final 5 minutes until next measurement
             delay(fiveMinMs)
         } else {
-            // For intervals shorter than 10 minutes
-            if (totalMs > 0) delay(totalMs)
+            // Short intervals (< 10 minutes, e.g. for quick testing)
+            val step = totalMs / 4
+            delay(step)
+            playBeepsAndVibrate(3)
+
+            delay(step)
+            playBeepsAndVibrate(2)
+
+            delay(step)
+            playBeepsAndVibrate(1)
+
+            delay(totalMs - (step * 3))
         }
     }
 
-    private suspend fun playBeeps(times: Int) = withContext(Dispatchers.Default) {
+    private suspend fun playBeepsAndVibrate(times: Int) = withContext(Dispatchers.Default) {
         try {
-            val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+            // STREAM_ALARM plays audio loudly through the alarm volume channel
+            val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+            
+            // Trigger device vibration
+            triggerVibration()
+
             repeat(times) { count ->
-                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
-                if (count < times - 1) delay(300)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                if (count < times - 1) delay(350)
             }
             delay(200)
             toneGen.release()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to play beeps", e)
+            Log.e(TAG, "Failed to play audio/vibration", e)
+        }
+    }
+
+    private fun triggerVibration() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(300)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Vibration failed", e)
         }
     }
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID, "BPLog", NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "Blood pressure holter monitoring" }
+            CHANNEL_ID, "BPLog Alerts", NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Blood pressure holter alerts"
+            enableVibration(true)
+            enableLights(true)
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
@@ -142,6 +180,7 @@ class HolterService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pending)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
     }
 
