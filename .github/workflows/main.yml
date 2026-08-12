@@ -19,6 +19,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Enable AndroidX in gradle.properties
+        run: |
+          echo "android.useAndroidX=true" >> android/gradle.properties
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
