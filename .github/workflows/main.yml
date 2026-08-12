@@ -19,21 +19,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Configure Android SDK Path
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+      - name: Setup Gradle Toolchain
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
+      - name: Fix script permissions and line endings
+        run: |
+          sed -i 's/\r$//' android/gradlew
+          chmod +x android/gradlew
 
       - name: Build Debug APK
+        working-directory: ./android
         run: |
-          cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug || gradle assembleDebug
 
       - name: Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: BPLog-Original-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
