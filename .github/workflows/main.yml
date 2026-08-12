@@ -19,18 +19,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle Toolchain
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Fix script permissions and line endings
-        run: |
-          sed -i 's/\r$//' android/gradlew
-          chmod +x android/gradlew
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
       - name: Build Debug APK
-        working-directory: ./android
         run: |
-          ./gradlew assembleDebug || gradle assembleDebug
+          cd android
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         if: success()
